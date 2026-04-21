@@ -7,7 +7,7 @@ class Shooter:
     TURRET_LENGTH = 0.06
     MOVE_SPEED = 0.01
     ROTATE_SPEED = 3  # DEGREES per frame
-    COOLDOWN = 30  # frames until the next shot can be fired
+    COOLDOWN = 10  # frames until the next shot can be fired
     WIDTH = 0.05
     HEIGHT = 0.04
 
@@ -32,17 +32,17 @@ class Shooter:
             self.recharge_time -= 1
 
     def controls(self, button):
-        if button == 'A':
-            self.velocity = -0.5  # Move left
-        elif button == 'D':
-            self.velocity = 0.5  # Move right
-        elif button == 'S':
+        if button == 'a':
+            self.velocity = -self.MOVE_SPEED  # Move left
+        elif button == 'd':
+            self.velocity = self.MOVE_SPEED  # Move right
+        elif button == 's':
             self.velocity = 0   # Stop moving
 
         # for rotating the turret
-        elif button == 'LEFT':
+        elif button == ',':
             self.turret_angle = min(180, self.turret_angle + self.ROTATE_SPEED)  # Rotate turret left
-        elif button == 'RIGHT':
+        elif button == '.':
             self.turret_angle = max(0, self.turret_angle - self.ROTATE_SPEED)  # Rotate turret right
 
     def shoot(self):
