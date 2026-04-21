@@ -29,8 +29,10 @@ class Enemy:
         stddraw.setPenColor(stddraw.BLACK)
         stddraw.filledCircle(self.x, self.y, 0.01)
 
+        
+
     def check_collision(self, missile_x, missile_y, missile_radius):
-        """Checks if a missile has struck this enemy."""
+        #Checks if a missile has struck this enemy
         if not self.is_alive:
             return False
 
