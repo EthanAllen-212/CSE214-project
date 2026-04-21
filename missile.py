@@ -13,7 +13,7 @@ class Missile:
         self.vx = self.SPEED * math.cos(angle_rad)
         self.vy = self.SPEED * math.sin(angle_rad)
 
-    def move(self):
+    def update(self):
         self.x += self.vx
         self.y += self.vy
     
