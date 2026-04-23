@@ -4,65 +4,64 @@ from missile import Missile  # type: ignore
 
 class Shooter:
 
-    TURRET_LENGTH = 0.06
+    TURRET_LENGTH = 0.07  
     MOVE_SPEED = 0.01
-    ROTATE_SPEED = 3  # DEGREES per frame
-    COOLDOWN = 10  # frames until the next shot can be fired
-    WIDTH = 0.05
-    HEIGHT = 0.04
+    COOLDOWN = 10     
+    WIDTH = 0.06    
+    HEIGHT = 0.07   
 
     def __init__(self, x, y):
-        self.x = x                 # horizontal position 
-        self.y = y                 # vertical position
-        self.velocity = 0       # controlled by A/S/D buttons
-        self.turret_angle = 90     # pointing straight up
-        self.recharge_time = 0     # time until next shot can be fired
+        self.x = x                 
+        self.y = y                 
+        self.velocity = 0          
+        self.turret_angle = 90     
+        self.recharge_time = 0     
 
     def update(self, left=0.0, right=1.0):
         self.x += self.velocity
-
-        # Keep the shooter within the bounds of the screen
-        if self.x < left:
-            self.x = left
-        elif self.x > right:
-            self.x = right
-
-        # Decrease recharge time if it's greater than 0
-        if self.recharge_time > 0:
-            self.recharge_time -= 1
+        if self.x < left: self.x = left
+        elif self.x > right: self.x = right
+        if self.recharge_time > 0: self.recharge_time -= 1
 
     def controls(self, button):
-        if button == 'a':
-            self.velocity = -self.MOVE_SPEED  # Move left
-        elif button == 'd':
-            self.velocity = self.MOVE_SPEED  # Move right
-        elif button == 's':
-            self.velocity = 0   # Stop moving
-
-        # for rotating the turret
-        elif button == ',':
-            self.turret_angle = min(180, self.turret_angle + self.ROTATE_SPEED)  # Rotate turret left
-        elif button == '.':
-            self.turret_angle = max(0, self.turret_angle - self.ROTATE_SPEED)  # Rotate turret right
+        if button == 'a': self.velocity = -self.MOVE_SPEED
+        elif button == 'd': self.velocity = self.MOVE_SPEED
+        elif button == 's': self.velocity = 0
 
     def shoot(self):
-        # Return a missile object if the shooter can fire, otherwise return None
-        if self.recharge_time > 0:
-            return None 
+        if self.recharge_time > 0: return None
         angle_rad = math.radians(self.turret_angle)
         tip_x = self.x + self.TURRET_LENGTH * math.cos(angle_rad)
         tip_y = self.y + self.TURRET_LENGTH * math.sin(angle_rad)
-        self.recharge_time = self.COOLDOWN  # Reset recharge time
-        return Missile(tip_x, tip_y, self.turret_angle)  # Create a new missile at the tip of the turret
-    
+        self.recharge_time = self.COOLDOWN
+        return Missile(tip_x, tip_y, self.turret_angle)
+
     def draw(self):
-        stddraw.filledRectangle(self.x - self.WIDTH, self.y, self.WIDTH * 2, self.HEIGHT)  # Draw the base of the shooter
+        # 1. SIDE WINGS (Aggressive Red Triangles)
+        stddraw.setPenColor(stddraw.RED)
+        # Left Wing
+        stddraw.filledPolygon([self.x - 0.02, self.x - 0.07, self.x - 0.02], 
+                             [self.y + 0.02, self.y - 0.03, self.y - 0.01])
+        # Right Wing
+        stddraw.filledPolygon([self.x + 0.02, self.x + 0.07, self.x + 0.02], 
+                             [self.y + 0.02, self.y - 0.03, self.y - 0.01])
 
-        stddraw.filledCircle(self.x, self.y + self.HEIGHT, self.WIDTH * 0.3) # Base of the turret (a circle on top of the rectangle)
+        # 2. MAIN HULL (Deep Blue Fuselage)
+        stddraw.setPenColor(stddraw.BOOK_BLUE)
+        hull_x = [self.x - 0.025, self.x, self.x + 0.025, self.x]
+        hull_y = [self.y - 0.01, self.y + self.HEIGHT, self.y - 0.01, self.y - 0.02]
+        stddraw.filledPolygon(hull_x, hull_y)
 
-        # the barrel of the turret 
-        angle_rad = math.radians(self.turret_angle)
-        tip_x = self.x + self.TURRET_LENGTH * math.cos(angle_rad)
-        tip_y = (self.y + self.HEIGHT) + self.TURRET_LENGTH * math.sin(angle_rad)
-        stddraw.line(self.x, self.y + self.HEIGHT, tip_x, tip_y)  # Draw the turret as a line from the center to the tip
+        # 3. COCKPIT (Black glass for a "stealth" look)
+        stddraw.setPenColor(stddraw.BLACK)
+        stddraw.filledCircle(self.x, self.y + 0.025, 0.012)
+
+        # 4. ENGINE GLOW (Red Thrusters)
+        stddraw.setPenColor(stddraw.RED)
+        stddraw.filledCircle(self.x - 0.015, self.y - 0.015, 0.006)
+        stddraw.filledCircle(self.x + 0.015, self.y - 0.015, 0.006)
         
+        # 5. NOSE CANNON (Small White Tip)
+        stddraw.setPenColor(stddraw.WHITE)
+        stddraw.filledCircle(self.x, self.y + self.HEIGHT, 0.005)
+
