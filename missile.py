@@ -18,7 +18,16 @@ class Missile:
         self.y += self.vy
     
     def off_screen(self):
+        # Checks if the missile has left the canvas bounds
         return self.x < 0 or self.x > 1 or self.y < 0 or self.y > 1
     
     def draw(self):
-        stddraw.filledCircle(self.x, self.y, 0.01)  # Draw the missile as a small circle
+        # Draw the outer circle (Orange Glow)
+        stddraw.setPenColor(stddraw.ORANGE)
+        stddraw.filledCircle(self.x, self.y, 0.01)
+        
+        # Draw the inner circle (Black Core)
+        # Radius 0.007 leaves a nice 0.003 orange border
+        stddraw.setPenColor(stddraw.BLACK)
+        stddraw.filledCircle(self.x, self.y, 0.007)
+
