@@ -1,252 +1,218 @@
-import stddraw 
+import stddraw
 import sys
-import stdaudio
-import picture 
-import threading
 import shooter
 import missile
 import enemyfile2
 import stdrandom
+import threading
+from gameinfo import GameInfo # Importing your custom class
 
-class Game: 
+# Safe imports for audio/picture
+try:
+    import picture
+except:
+    picture = None
+try:
+    import stdaudio
+except:
+    stdaudio = None
 
+class Game:
     def __init__(self):
         stddraw.setCanvasSize(800, 600)
+        stddraw.setXscale(0.0, 1.0)
+        stddraw.setYscale(0.0, 1.0)
 
-        self.enemy_dx = 0.005   # How fast they move left/right
+        self.enemy_dx = 0.005
         self.enemy_drop = 0.05
-        
         self.state = "title screen"
-        self.game_over_timer = 0
         self.score = 0
-
-        self.title_image = picture.Picture("Title_screen.png")
-
-        self.music_started = False
+        self.wave = 1
+        self.game_over_timer = 120
 
         self.player = None
         self.enemies = []
         self.missiles = []
-        #creates game class
-        #screen size (need setting, so no hard code)
-        #does game states
-        #plays music 
-        #check version of stddraw im using bc its behaving weirdly ``
+        self.info = GameInfo() # Initialise the imported GameInfo
+        
+        self.title_image = "Title_screen.png"
+        self.galaxy_bg = "galaxy.png"
+        self.music_started = False
 
-    def play_music_loop(self):
-
-        while True:
-            stdaudio.playFile("music.wav")
+    # ---------------- AUDIO ----------------
+    def play_music(self):
+        if not stdaudio: return
+        try:
+            while True: stdaudio.playFile("music.wav")
+        except: pass
 
     def start_music(self):
-        music_thread = threading.Thread(target=self.play_music_loop, daemon=True)
-        music_thread.start()
+        if self.music_started: return
+        self.music_started = True
+        if stdaudio:
+            threading.Thread(target=self.play_music, daemon=True).start()
 
+    # ---------------- MAIN LOOP ----------------
     def run(self):
-        
-
         while True:
+            self.start_music()
             self.handle_input()
             self.update()
             self.draw()
             stddraw.show(20)
-    #handles imput from player 
-    #runs the whole time
 
-
-    #toke me 2 hours to get the musci to loop so i hope it works 
-
+    # ---------------- INPUT (A, D, S, P) ----------------
     def handle_input(self):
         if stddraw.hasNextKeyTyped():
-            key = stddraw.nextKeyTyped()
+            key = stddraw.nextKeyTyped().lower()
             
-            if key == "q":
-                sys.exit()
+            if key == "q": sys.exit()
+
+            # Pause Toggle
+            if key == "p":
+                if self.state == "playing": self.state = "paused"
+                elif self.state == "paused": self.state = "playing"
 
             if self.state == "title screen":
-                if key == " ":
-                    self.start_new_game()
+                if key == " ": self.start_new_game()
             
             elif self.state == "playing":
-                if key == "g":
-                    self.end_game()
-
-                
-                if self.player != None:
+                if self.player:
                     self.player.controls(key)
-
                     if key == " ":
-                        new_missile = self.player.shoot()
-                        if new_missile != None: 
-                            self.missiles.append(new_missile)
+                        m = self.player.shoot()
+                        if m: self.missiles.append(m)
 
-            elif self.state == "game over":
-                pass
-    #handles input to start, end and quit the game
-
-
+    # ---------------- UPDATE ----------------
     def update(self):
-        if not self.music_started:
-            self.start_music()        
-            self.music_started = True
-            
-        if self.state == "playing":
-            if self.player != None:
-                self.player.update()
-                
-            for m in self.missiles:
-                m.update() 
+        # Freeze game if not in "playing" state
+        if self.state != "playing":
+            if self.state == "game over":
+                self.game_over_timer -= 1
+                if self.game_over_timer <= 0: self.state = "title screen"
+            return 
 
-           
-            hit_edge = False
-            for enemy in self.enemies:
-                if enemy.is_alive and enemy.is_at_edge():
-                    hit_edge = True
-                    break 
-            
+        if self.player: self.player.update()
+        for m in self.missiles: m.update()
 
-            if hit_edge:
-                self.enemy_dx *= -1 
-                for enemy in self.enemies:
-                    
-                    enemy.move(self.enemy_dx, -self.enemy_drop) 
-            else:
-                
-                for enemy in self.enemies:
-                    enemy.move(self.enemy_dx, 0)
-            #when enemy hits edge, move down and reverse direction, otherwise just move in current direction
-            
-            
-            missile_radius = 0.01 
-            for m in self.missiles[:]:
-                hit_something = False
-                for enemy in self.enemies:
-                    if enemy.is_alive and enemy.check_collision(m.x, m.y, missile_radius):
-                        self.score += 100
-                        hit_something = True
-                        break 
-                
-                
-                if hit_something:
-                    self.missiles.remove(m)
-                    
-            
-            for enemy in self.enemies:
-                if enemy.is_alive and enemy.reached_ground(0.15):
+        # Enemy Movement
+        hit_edge = False
+        for e in self.enemies:
+            if e.is_alive and e.is_at_edge():
+                hit_edge = True
+                break
+
+        if hit_edge:
+            self.enemy_dx *= -1
+            for e in self.enemies: e.move(self.enemy_dx, -self.enemy_drop)
+        else:
+            for e in self.enemies: e.move(self.enemy_dx, 0)
+
+        # Missile Collisions
+        missile_radius = 0.01
+        for m in self.missiles[:]:
+            hit = False
+            for e in self.enemies:
+                if e.is_alive and e.check_collision(m.x, m.y, missile_radius):
+                    self.score += 100
+                    e.is_alive = False
+                    hit = True
+                    break
+            if hit: self.missiles.remove(m)
+
+        # FAIL CONDITIONS (Touch ship or cross bottom)
+        for e in self.enemies:
+            if e.is_alive:
+                if e.y < 0.12 or (self.player and e.check_collision(self.player.x, self.player.y, 0.05)):
                     self.end_game()
 
-           
-            self.missiles = [m for m in self.missiles if not m.off_screen()]
-
-            for enemy in self.enemies:
-                
-                pass 
-                
-            
-            self.missiles = [m for m in self.missiles if not m.off_screen()]
+        self.missiles = [m for m in self.missiles if not m.off_screen()]
         
-            any_alive = False
-            for enemy in self.enemies:
-                if enemy.is_alive:
-                    any_alive = True
-                    break 
-            
-           
-            if not any_alive:
-                self.wave += 1
-                self.spawn_wave()
-                self.missiles = [] 
+        if len(self.enemies) > 0 and all(not e.is_alive for e in self.enemies):
+            self.wave += 1
+            self.spawn_wave()
 
-        elif self.state == "game over":
-            self.game_over_timer -= 1
-            if self.game_over_timer <= 0:
-                self.state = "title screen"
-
+    # ---------------- DRAW ----------------
     def draw(self):
-        stddraw.clear()
+        # No gray background - start with black
+        stddraw.clear(stddraw.BLACK)
 
+        # Layer 1: Background Galaxy
+        try:
+            stddraw.picture(0.5, 0.5, self.galaxy_bg)
+        except:
+            pass
+
+        # Layer 2: State-specific content
         if self.state == "title screen":
-            self.draw_title_screen()
-
+            self.draw_title()
         elif self.state == "playing":
             self.draw_game()
-
+        elif self.state == "paused":
+            self.draw_game()
+            self.draw_pause_overlay()
         elif self.state == "game over":
             self.draw_game()
             self.draw_game_over()
 
-    def draw_title_screen(self):
-        stddraw.picture(self.title_image, 0.5, 0.5)         
+    def draw_title(self):
+        try:
+            stddraw.picture(0.5, 0.5, self.title_image)
+        except:
+            stddraw.setPenColor(stddraw.WHITE)
+            stddraw.setFontSize(30)
+            stddraw.text(0.5, 0.7, "COSMIC CONQUISTADORS")
+
+        # Instructions from gameinfo class
+        self.info.draw_instructions()
+
+        stddraw.setPenColor(stddraw.YELLOW)
+        stddraw.setFontSize(20)
+        stddraw.text(0.5, 0.15, "PRESS SPACE TO START")
 
     def draw_game(self):
+        stddraw.setPenColor(stddraw.WHITE)
         stddraw.text(0.1, 0.95, "Score: " + str(self.score))
-        
-        if self.player != None:
-            self.player.draw()
+        if self.player: self.player.draw()
+        for e in self.enemies: e.draw()
+        for m in self.missiles: m.draw()
 
-        for enemy in self.enemies:
-            enemy.draw()
-
-        for m in self.missiles:
-            m.draw()
-
+    def draw_pause_overlay(self):
+        stddraw.setPenColor(stddraw.WHITE)
+        stddraw.setFontSize(40)
+        stddraw.text(0.5, 0.55, "PAUSED")
+        stddraw.setFontSize(20)
+        stddraw.text(0.5, 0.45, "Press 'P' to Resume")
 
     def draw_game_over(self):
         stddraw.setPenColor(stddraw.RED)
-        stddraw.setFontSize(50)
-        stddraw.text(0.5,0.6, "GAME OVER")
-        stddraw.setFontSize(20) 
-        stddraw.setPenColor(stddraw.BLACK)
-        stddraw.text(0.5, 0.45, "Final Score: " + str(self.score))
-        stddraw.text(0.5, 0.35, "Returning to title screen... ")    
+        stddraw.setFontSize(40)
+        stddraw.text(0.5, 0.6, "GAME OVER")
 
+    # ---------------- GAME SETUP ----------------
     def start_new_game(self):
         self.score = 0
         self.state = "playing"
-        self.player = shooter.Shooter(0.5, 0.1) 
+        self.player = shooter.Shooter(0.5, 0.1)
         self.missiles = []
-        self.enemies = []
-        self.enemy_dx = 0.005 
-        self.enemies = []
-        
         self.wave = 1
         self.spawn_wave()
-    
+
     def spawn_wave(self):
         self.enemies = []
-        
-        
         base_speed = 0.005
-        speed_boost = (self.wave - 1) * 0.0015
-        self.enemy_dx = base_speed + speed_boost
-        #increase speed each wave
-        
-        if self.wave == 1:
-            
-            for row in range(3):
-                for col in range(5):
-                    x = 0.2 + (col * 0.12)
-                    y = 0.8 - (row * 0.12)
-                    self.enemies.append(enemyfile2.Enemy(x, y))
-
-        
-        else:
-            
-            max_rows = min(6, 1 + (self.wave // 2)) 
-            max_cols = 7
-            
-            for row in range(max_rows):
-                for col in range(max_cols):
-                    
-                    if stdrandom.bernoulli(0.7): 
-                        x = 0.15 + (col * 0.1)
-                        y = 0.9 - (row * 0.1)
-                        self.enemies.append(enemyfile2.Enemy(x, y))
-    #after wave 1 spawn random formations with increasing speed
+        self.enemy_dx = base_speed + (self.wave - 1) * 0.0015
+        for r in range(3):
+            for c in range(5):
+                x = 0.2 + c * 0.12
+                y = 0.8 - r * 0.12
+                self.enemies.append(enemyfile2.Enemy(x, y))
 
     def end_game(self):
         self.state = "game over"
         self.game_over_timer = 120
-        
-my_game = Game()
-my_game.run()
+
+if __name__ == "__main__":
+    game = Game()
+    game.run()
+
